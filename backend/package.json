@@ -1,0 +1,13 @@
+{
+  "name": "clearmetric-api",
+  "version": "1.0.0",
+  "description": "ClearMetric Backend API - Power BI Dashboard Explainer",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=18"
+  }
+}
