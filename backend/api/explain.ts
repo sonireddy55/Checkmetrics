@@ -1,22 +1,96 @@
+// @ts-nocheck
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const SYSTEM_PROMPT = `You are a dashboard explainer for Power BI reports. Your role is to help users understand what they see on their dashboard.
+// System prompts for each analysis type
+const SYSTEM_PROMPTS = {
+  trends: `You are a dashboard analyst specializing in trend detection. Analyze the provided dashboard data.
 
-STRICT RULES:
-1. Use ONLY the provided dashboard text to explain what is present
-2. If asked about information NOT in the provided text, respond exactly: "I cannot verify this from the current dashboard data."
-3. Do NOT invent numbers, calculate new KPIs, or make predictions
-4. Do NOT guess or make assumptions about data not shown
-5. Be concise and helpful
+YOUR TASK: Identify what has CHANGED compared to previous periods.
 
-Output your response as valid JSON with this schema:
+LOOK FOR:
+- Percentages with +/- signs (e.g., "+12%", "-5%")
+- Comparisons (vs last month, YoY, MoM, QoQ)
+- Arrows or indicators showing direction
+- Words like "increase", "decrease", "growth", "decline"
+
+OUTPUT FORMAT (JSON only):
 {
-  "explanation": "Your clear explanation here",
-  "verifiable": true or false,
-  "citations": ["exact text from dashboard that supports your explanation"]
+  "explanation": "Clear summary of what changed, written for a busy manager. Start with the most important change.",
+  "changes": [{"metric": "name", "direction": "up/down", "magnitude": "value if shown"}],
+  "verifiable": true,
+  "citations": ["exact text from dashboard"]
 }
 
-Return ONLY the JSON object, no additional text.`
+RULES:
+- Only report changes you can SEE in the data
+- If no comparison data exists, say "No trend data visible on this dashboard"
+- Never invent percentages`,
+
+  drivers: `You are a dashboard analyst specializing in root cause analysis. Analyze the provided dashboard data.
+
+YOUR TASK: Identify what factors are DRIVING the key metrics shown.
+
+LOOK FOR:
+- Breakdowns by category, region, product, or segment
+- The largest contributors (top performers)
+- The smallest contributors (underperformers)
+- Any filtering or segmentation visible
+
+OUTPUT FORMAT (JSON only):
+{
+  "explanation": "Clear summary of what's driving performance. Lead with the biggest factor.",
+  "drivers": [{"factor": "name", "impact": "high/medium/low", "detail": "brief note"}],
+  "verifiable": true,
+  "citations": ["exact text from dashboard"]
+}
+
+RULES:
+- Only cite factors VISIBLE in the data
+- If no breakdown data exists, say "No driver breakdown visible. Try filtering the dashboard."
+- Never guess at causation`,
+
+  anomalies: `You are a dashboard analyst specializing in anomaly detection. Analyze the provided dashboard data.
+
+YOUR TASK: Spot anything that looks UNUSUAL or potentially wrong.
+
+LOOK FOR:
+- Numbers that seem too high or too low
+- Zeroes where there should be values
+- Sudden spikes or drops
+- Missing data or "N/A" values
+- Percentages over 100% or negative where unexpected
+- Dates that seem wrong
+
+OUTPUT FORMAT (JSON only):
+{
+  "explanation": "List of potential issues found, starting with the most concerning.",
+  "anomalies": [{"issue": "description", "severity": "high/medium/low", "location": "where on dashboard"}],
+  "verifiable": true,
+  "citations": ["exact text from dashboard"]
+}
+
+RULES:
+- Only flag things you can VERIFY from the data
+- If everything looks normal, say "No obvious anomalies detected"
+- Be specific about location`,
+
+  custom: `You are a helpful dashboard analyst. Answer the user's specific question about the dashboard.
+
+RULES:
+1. Use ONLY the provided dashboard text
+2. If the answer isn't in the data, say "I cannot find this in the visible dashboard"
+3. Be concise and direct
+4. Cite specific numbers when possible
+
+OUTPUT FORMAT (JSON only):
+{
+  "explanation": "Your answer here",
+  "verifiable": true,
+  "citations": ["exact text that supports your answer"]
+}`
+}
+
+const DEFAULT_PROMPT = SYSTEM_PROMPTS.custom
 
 function tryParseJson(text: string) {
   try {
@@ -48,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed, use POST' })
   }
 
-  const { text } = req.body || {}
+  const { text, analysisType, customQuestion } = req.body || {}
 
   if (!text || typeof text !== 'string' || text.trim().length === 0) {
     return res.status(400).json({ error: 'Missing "text" in request body' })
@@ -59,12 +133,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Server misconfigured: OPENAI_API_KEY not set' })
   }
 
+  // Select the appropriate system prompt
+  const systemPrompt = SYSTEM_PROMPTS[analysisType] || DEFAULT_PROMPT
+
+  // Build user message based on analysis type
+  let userMessage = `Here is the dashboard text:\n\n${text.substring(0, 8000)}`
+  if (analysisType === 'custom' && customQuestion) {
+    userMessage += `\n\nUser's question: ${customQuestion}`
+  }
+
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    {
-      role: 'user',
-      content: `Here is the dashboard text. Analyze it and return JSON only:\n\n${text.substring(0, 8000)}`
-    }
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage }
   ]
 
   try {

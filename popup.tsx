@@ -1,4 +1,8 @@
+// @ts-nocheck
 import React, { useEffect, useState } from "react"
+
+// Chrome extension types
+/// <reference types="chrome"/>
 
 const BACKEND_URL = "https://your-vercel-proxy.vercel.app/api/explain" // <-- replace with your backend URL
 
@@ -36,7 +40,7 @@ function IndexPopup() {
 
     try {
       // ask the active tab to run the content script scraper
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs: chrome.tabs.Tab[]) => {
         const tab = tabs?.[0]
         if (!tab?.id) {
           setMessages([{ role: "system", content: "No active tab found." }])
@@ -44,7 +48,7 @@ function IndexPopup() {
           return
         }
 
-        chrome.tabs.sendMessage(tab.id!, { type: "CLEARMETRIC_SCRAPE" }, async (response) => {
+        chrome.tabs.sendMessage(tab.id!, { type: "CLEARMETRIC_SCRAPE" }, async (response: any) => {
           const scraped = response?.text || ""
           setRawText(scraped)
 

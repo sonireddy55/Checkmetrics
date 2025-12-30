@@ -1,6 +1,9 @@
-import type { PlasmoCSConfig } from "plasmo"
+// Content script for Power BI scraping
+// This file is for Chrome extension mode and won't be used in VS Code extension
+// @ts-nocheck
+/// <reference types="chrome"/>
 
-export const config: PlasmoCSConfig = {
+const config = {
   matches: [
     "https://app.powerbi.com/*",
     "https://playground.powerbi.com/*",
@@ -11,20 +14,28 @@ export const config: PlasmoCSConfig = {
   run_at: "document_idle"
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.type === "CLEARMETRIC_SCRAPE") {
-    let reportText = ""
+// Wrap in try-catch to handle extension context invalidation
+try {
+  chrome.runtime.onMessage.addListener((msg: any, _sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+    // Check if extension context is still valid
+    if (!chrome.runtime?.id) {
+      console.log("[ClearMetric] Extension context invalidated, ignoring message")
+      return false
+    }
+    
+    if (msg.type === "CLEARMETRIC_SCRAPE") {
+      let reportText = ""
 
-    // Try multiple selectors to find dashboard content
-    const selectors = [
-      ".reportContainer",
-      ".report-canvas",
-      "[data-testid='report-page']",
-      ".visualContainer",
-      ".exploration",
-      "iframe.report-embed",
-      "iframe[title*='Power']",
-      "iframe[src*='powerbi']"
+      // Try multiple selectors to find dashboard content
+      const selectors = [
+        ".reportContainer",
+        ".report-canvas",
+        "[data-testid='report-page']",
+        ".visualContainer",
+        ".exploration",
+        "iframe.report-embed",
+        "iframe[title*='Power']",
+        "iframe[src*='powerbi']"
     ]
 
     // First, try to find text directly in the page
@@ -69,3 +80,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   return true
 })
+} catch (e) {
+  console.log("[ClearMetric] Content script error (extension may have been reloaded):", e)
+}

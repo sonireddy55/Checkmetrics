@@ -1,0 +1,12 @@
+{
+  "files.exclude": {
+    "**/.plasmo": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.plasmo": true,
+    "**/build": true
+  },
+  "typescript.validate.enable": true,
+  "typescript.tsdk": "node_modules/typescript/lib"
+}
