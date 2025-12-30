@@ -4,7 +4,7 @@ import "./style.css"
 
 /// <reference types="chrome"/>
 
-const BACKEND_URL = "https://checkmetrics-rbpp.vercel.app/api/explain"
+const BACKEND_URL = "https://checkmetrics-uvrh.vercel.app/api/explain"
 
 // Usage limits - optimized for conversion
 const FREE_ANALYSES_LIMIT = 10
